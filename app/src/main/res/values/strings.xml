@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WirePlug</string>
+    <string name="channel_status">Service status</string>
+    <string name="channel_status_desc">Ongoing notification while WirePlug is running</string>
+    <string name="stop">Stop</string>
+</resources>
