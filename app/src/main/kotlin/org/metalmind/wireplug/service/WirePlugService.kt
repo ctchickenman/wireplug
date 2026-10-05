@@ -69,6 +69,7 @@ class WirePlugService : Service() {
             )
         )
         current = engine
+        recheckHook = { detector.recheck() }
         AppState.setServiceRunning(true)
         detector = ModeDetector(this, scope, { store.current.home }) { check, network, changed ->
             AppState.setHomeCheck(check)
@@ -163,6 +164,7 @@ class WirePlugService : Service() {
         detector.stop()
         scope.cancel()
         current = null
+        recheckHook = null
         engine.stop()
         AppState.setApplyErrors(emptyMap())
         AppState.setServiceRunning(false)
@@ -176,6 +178,13 @@ class WirePlugService : Service() {
         /** The running engine, for the UI's Test and Retry actions. */
         @Volatile var current: Engine_? = null
             private set
+
+        @Volatile private var recheckHook: (() -> Unit)? = null
+
+        /** Re-runs the home check, e.g. after a permission is granted. */
+        fun recheck() {
+            recheckHook?.invoke()
+        }
 
         fun start(context: Context) {
             try {

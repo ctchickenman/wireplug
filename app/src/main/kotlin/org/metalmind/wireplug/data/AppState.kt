@@ -97,6 +97,8 @@ data class HomeCheck(
     val summary: String = "Not checked yet",
     val probe: String = "",
     val networkName: String = "",
+    /** Whether ACCESS_LOCAL_NETWORK was held when the check ran. */
+    val lanAllowed: Boolean = true,
 )
 
 /** Process-wide live state shared by the service and the UI. */

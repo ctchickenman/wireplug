@@ -157,6 +157,7 @@ The app targets a minimum of Android 8.0 (API 26), and the current stable target
 | `FOREGROUND_SERVICE` plus a service type | Keeping listeners and the tunnel alive | Android 14 and later require a declared type; choose and justify one |
 | `POST_NOTIFICATIONS` | The ongoing service notification | Runtime permission on Android 13 and later |
 | `RECEIVE_BOOT_COMPLETED` | Optional start at boot | Used only if the setting is on |
+| `ACCESS_LOCAL_NETWORK` | Direct connections to the LAN in Home mode | Runtime permission on Android 17 and later for apps targeting API 37. Without it, Home falls back to the tunnel. DNS on port 53 is exempt, so the home check works without it |
 
 ### Behaviour requirements
 

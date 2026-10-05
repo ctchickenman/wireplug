@@ -28,7 +28,7 @@ import java.net.SocketTimeoutException
  * with the mode and the network it was decided on.
  */
 class ModeDetector(
-    context: Context,
+    private val context: Context,
     private val scope: CoroutineScope,
     private val settings: () -> HomeSettings,
     private val onResult: (check: HomeCheck, network: Network?, networkChanged: Boolean) -> Unit,
@@ -79,27 +79,34 @@ class ModeDetector(
         lastNetwork = network
         currentNetwork = network
         val now = System.currentTimeMillis()
+        val lanAllowed = LocalNetwork.isAllowed(context)
         if (network == null || caps == null || !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-            onResult(HomeCheck(now, "offline", false, "No usable network"), null, changed)
+            onResult(HomeCheck(now, "offline", false, "No usable network", lanAllowed = lanAllowed), null, changed)
             return
         }
         val name = networkLabel(caps)
         val s = settings()
         if (!s.isConfigured) {
-            onResult(HomeCheck(now, "away", false, "No home DNS check configured", networkName = name), network, changed)
+            onResult(HomeCheck(now, "away", false, "No home DNS check configured", networkName = name, lanAllowed = lanAllowed), network, changed)
             return
         }
         val lp = cm.getLinkProperties(network)
         val servers = lp?.dnsServers.orEmpty()
         val check = withContext(Dispatchers.IO) { homeLookup(network, servers, s) }
         var mode = if (check.first) "home" else "away"
+        var summary = check.second
         var probe = ""
-        if (check.first && s.probeEnabled) {
+        if (check.first && !lanAllowed) {
+            // Direct connections would be blocked by the platform; the
+            // tunnel still reaches the same addresses.
+            mode = "away"
+            summary = "${check.second}, but local network access is not allowed: using the tunnel"
+        } else if (check.first && s.probeEnabled) {
             val ok = withContext(Dispatchers.IO) { probe(network, s.probeHost, s.probePort) }
             probe = if (ok == null) "Probe ${s.probeHost}:${s.probePort} connected" else "Probe failed: $ok"
             if (ok != null) mode = "away"
         }
-        onResult(HomeCheck(now, mode, check.first, check.second, probe, name), network, changed)
+        onResult(HomeCheck(now, mode, check.first, summary, probe, name, lanAllowed), network, changed)
     }
 
     private fun networkLabel(caps: NetworkCapabilities): String = when {

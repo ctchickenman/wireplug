@@ -70,6 +70,12 @@ Import the file in **Settings → Tunnel**, add a forward such as
   sockets are passed to `Host.BindTunnelSocket` before use, so the tunnel's UDP
   socket is bound to the current default network. `BindUpdate` rebuilds it on
   network changes (F5).
+- **Local network permission:** Android 17 blocks connections to LAN addresses
+  for apps targeting API 37 unless they hold `ACCESS_LOCAL_NETWORK`. DNS on
+  port 53 is exempt, so the home check passes without it, but direct
+  connections time out. WirePlug asks for it when the home check is saved and
+  shows a warning while it is missing. Until it is granted, Home falls back to
+  the tunnel so forwards keep working.
 - **Other VPNs (P5):** when another VPN is the default network, both routes go
   through it. This is known behaviour in v1.
 - **Boot receiver:** not exported; the system still delivers `BOOT_COMPLETED`

@@ -49,6 +49,7 @@ import org.metalmind.wireplug.data.RecordType
 import org.metalmind.wireplug.data.TunnelSettings
 import org.metalmind.wireplug.data.generatePassword
 import org.metalmind.wireplug.go.engine.Engine
+import org.metalmind.wireplug.net.LocalNetwork
 import org.metalmind.wireplug.service.WirePlugService
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -221,6 +222,8 @@ fun HomeNetworkScreen(store: ConfigStore, back: () -> Unit) {
     var probeHost by rememberSaveable { mutableStateOf(saved.probeHost) }
     var probePort by rememberSaveable { mutableStateOf(if (saved.probePort > 0) saved.probePort.toString() else "") }
     var error by remember { mutableStateOf<String?>(null) }
+    val ctx = LocalContext.current
+    val lanLauncher = rememberLanPermissionLauncher { back() }
 
     ScreenScaffold("Home network", back, actions = {
         SaveButton {
@@ -237,7 +240,9 @@ fun HomeNetworkScreen(store: ConfigStore, back: () -> Unit) {
                 store.update {
                     it.copy(home = HomeSettings(h, type, expected.trim(), probeHost.trim(), if (probeHost.isBlank()) 0 else intOr(probePort, 0)))
                 }
-                back()
+                // Home mode connects to the LAN directly, which Android 17
+                // allows only with the local network permission.
+                if (h.isNotEmpty() && !LocalNetwork.isAllowed(ctx)) lanLauncher() else back()
             }
         }
     }) {

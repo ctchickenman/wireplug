@@ -57,6 +57,7 @@ import org.metalmind.wireplug.data.Overall
 import org.metalmind.wireplug.data.formatAge
 import org.metalmind.wireplug.data.formatBytes
 import org.metalmind.wireplug.data.overallState
+import org.metalmind.wireplug.net.LocalNetwork
 import org.metalmind.wireplug.service.WirePlugService
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -90,6 +91,13 @@ fun StatusScreen(store: ConfigStore, go: (Screen) -> Unit) {
     }
 
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { resumes++ }
+    val lanLauncher = rememberLanPermissionLauncher { resumes++ }
+
+    // If local network access changed since the last home check (granted
+    // here or in system settings), re-run the check so Home goes direct.
+    LaunchedEffect(resumes, home.lanAllowed, home.time) {
+        if (home.time > 0 && home.lanAllowed != LocalNetwork.isAllowed(ctx)) WirePlugService.recheck()
+    }
 
     val overall = overallState(running, status)
     val warnings = remember(cfg, errors, resumes, running) {
@@ -99,6 +107,9 @@ fun StatusScreen(store: ConfigStore, go: (Screen) -> Unit) {
             if (Build.VERSION.SDK_INT >= 33 &&
                 ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
             ) add(Warning("Notification permission denied", "Fix") { notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) })
+            if (cfg.home.isConfigured && !LocalNetwork.isAllowed(ctx)) {
+                add(Warning("Local network access is not allowed: at home, forwards use the tunnel instead of the LAN", "Fix") { lanLauncher() })
+            }
             if (Build.VERSION.SDK_INT >= 28 && ctx.getSystemService(ActivityManager::class.java).isBackgroundRestricted) {
                 add(Warning("Battery restriction may stop the service", "Fix") { openAppSettings(ctx) })
             }
@@ -262,6 +273,8 @@ private fun headerDetail(
         append("Home DNS name matched on ${home.networkName.ifEmpty { "this network" }}")
         if (home.probe.isNotEmpty()) append(" · ${home.probe}")
     }
+    Overall.AWAY_IDLE if home.matched -> "On the home network · using the tunnel (no local network access)"
+    Overall.AWAY_UP if home.matched -> "On the home network · using the tunnel (no local network access)"
     Overall.AWAY_IDLE -> "On another network · tunnel starts on first connection"
     Overall.AWAY_CONNECTING -> "Handshake with ${s.tunnel.endpoint} · ${(now - s.tunnel.since).coerceAtLeast(0)} s"
     Overall.AWAY_UP -> "On another network · service running"
@@ -274,4 +287,25 @@ fun openAppSettings(ctx: Context) {
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     )
+}
+
+/**
+ * Returns a function that asks for ACCESS_LOCAL_NETWORK. Once the system
+ * stops showing the dialog (denied twice), it opens the app's settings.
+ */
+@Composable
+fun rememberLanPermissionLauncher(onResult: () -> Unit): () -> Unit {
+    val ctx = LocalContext.current
+    var asked by remember { mutableIntStateOf(0) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted && asked > 1) openAppSettings(ctx)
+        WirePlugService.recheck()
+        onResult()
+    }
+    return {
+        if (LocalNetwork.required) {
+            asked++
+            launcher.launch(LocalNetwork.PERMISSION)
+        }
+    }
 }
